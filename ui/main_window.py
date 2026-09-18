@@ -142,9 +142,11 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(APP_NAME)
-        icon = app_icon_path()
+        icon = app_icon_path().resolve()
         if icon.is_file():
-            self.setWindowIcon(QIcon(str(icon)))
+            qicon = QIcon(str(icon))
+            if not qicon.isNull():
+                self.setWindowIcon(qicon)
         self.resize(1280, 920)
         self.setMinimumSize(1100, 820)
 

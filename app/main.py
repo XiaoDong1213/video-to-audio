@@ -75,12 +75,17 @@ def _run_gui() -> int:
     app.setStyle("Fusion")
     install_qt_zh(app)
     app.setStyleSheet(load_app_stylesheet())
-    icon = app_icon_path()
-    if icon.is_file():
-        app.setWindowIcon(QIcon(str(icon)))
+
+    # Absolute path + multi-size .ico so Windows taskbar / Alt-Tab pick a real glyph
+    icon_file = app_icon_path().resolve()
+    app_icon = QIcon(str(icon_file)) if icon_file.is_file() else QIcon()
+    if not app_icon.isNull():
+        app.setWindowIcon(app_icon)
 
     logging.info("Qt API: %s", QT_API)
     window = MainWindow()
+    if not app_icon.isNull():
+        window.setWindowIcon(app_icon)
     window.show()
     return app_exec(app)
 
