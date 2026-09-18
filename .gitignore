@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+dist_installer/
+build/
+.pytest_cache/
+.codegraph/
+crash.log
+*.log
+config.json
+.env
+.DS_Store
+Thumbs.db
+output/
+
+# Large binaries — sync before packaging
+resources/ffmpeg/*.exe
+resources/ffmpeg/*.dll
+resources/ffmpeg_x86/*.exe
+resources/ffmpeg_x86/*.dll
