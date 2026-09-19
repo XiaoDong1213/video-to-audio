@@ -25,7 +25,6 @@ from core.utils import (
     collect_audio_files,
     collect_video_files,
     ensure_ffmpeg,
-    ffmpeg_version,
     move_selected,
     parse_optional_positive_int,
 )
@@ -50,7 +49,6 @@ from ui.qtcompat import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QStatusBar,
     QThread,
     QVBoxLayout,
     QWidget,
@@ -232,10 +230,6 @@ class MainWindow(QMainWindow):
         body_lay.addWidget(self._build_option_panel(), 2)
         root.addWidget(body, 1)
         root.addWidget(self._build_footer())
-
-        status = QStatusBar()
-        self.setStatusBar(status)
-        self._status = status
 
     def _build_header(self) -> QFrame:
         header = QFrame()
@@ -606,7 +600,6 @@ class MainWindow(QMainWindow):
     def _refresh_ffmpeg_status(self) -> None:
         try:
             ffmpeg, _ = ensure_ffmpeg()
-            ver = ffmpeg_version(ffmpeg).replace("Copyright", "·").split("·")[0].strip()
             bundled = bundled_ffmpeg_dir() / "ffmpeg.exe"
             tag = "内置" if Path(ffmpeg).resolve() == bundled.resolve() else "系统"
             bits = "64" if sys.maxsize > 2**32 else "32"
@@ -614,13 +607,11 @@ class MainWindow(QMainWindow):
             self.ffmpeg_badge.setProperty("status", "ok")
             self.ffmpeg_badge.style().unpolish(self.ffmpeg_badge)
             self.ffmpeg_badge.style().polish(self.ffmpeg_badge)
-            self._status.showMessage(f"{tag} · {bits}位 · {ver.replace('ffmpeg version ', '')[:40]}")
         except FFmpegNotFoundError:
             self.ffmpeg_badge.setText("未找到 FFmpeg")
             self.ffmpeg_badge.setProperty("status", "error")
             self.ffmpeg_badge.style().unpolish(self.ffmpeg_badge)
             self.ffmpeg_badge.style().polish(self.ffmpeg_badge)
-            self._status.showMessage("请运行 sync_ffmpeg.bat")
 
     def _append_log(self, text: str) -> None:
         self.log.appendPlainText(text)
