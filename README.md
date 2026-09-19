@@ -94,6 +94,8 @@ video-to-audio/
 ├── sync_ffmpeg_x86.bat
 ├── Video to audio.spec
 ├── Video to audio_x86.spec
+├── Video to audio.iss              # Inno Setup 7（x64）
+├── Video to audio_x86.iss          # Inno Setup 7（x86）
 ├── file_version_info.txt
 ├── requirements.txt
 ├── requirements-x86.txt
@@ -170,20 +172,41 @@ build_exe.bat
 
 ### x86（老款 32 位 Windows）
 
-需要 32 位 Python 3.8–3.10，以及已同步的 `resources\ffmpeg_x86\`：
+需要 **32 位** Python 3.8–3.10，以及已同步的 `resources\ffmpeg_x86\`。
+
+`build_exe_x86.bat` 默认使用本机路径 `D:\Python-32\python.exe`。换电脑时打开该 bat，把开头的 `PYTHON=` 改成你的 32 位解释器路径，例如：
+
+```bat
+set "PYTHON=C:\Path\to\python.exe"
+```
+
+确认该路径下的 `python.exe` 是 32 位后：
 
 ```bat
 sync_ffmpeg_x86.bat
 build_exe_x86.bat
 ```
 
-脚本使用 `D:\Python-32\python.exe`。
-
 输出：`dist\Video to audio_x86\`
 
 > PyQt6 不支持 Win32，故 32 位包使用 PyQt5；业务代码共用，`ui/qtcompat.py` 自动选择。
 
 打包脚本会尽量删除 `dist` 中的个人配置与日志，避免把开发机设置带入发布目录。
+
+---
+
+## Windows 安装程序（Inno Setup 7）
+
+先按上一节打出 `dist\` 目录，再用 [Inno Setup 7](https://jrsoftware.org/isinfo.php) 编译对应 `.iss`：
+
+| 架构 | 先运行 | 再编译 | 安装包输出 |
+| --- | --- | --- | --- |
+| x64 | `build_exe.bat` | `Video to audio.iss` | `dist_installer\Video to audio_Setup.exe` |
+| x86 | `build_exe_x86.bat` | `Video to audio_x86.iss` | `dist_installer\Video to audio_x86_Setup.exe` |
+
+在 Inno Setup Compiler 中打开对应 `.iss`，点 **Compile**。脚本相对项目根目录读取 `dist\`，换机器也能用。
+
+安装版用户配置在 `%APPDATA%\video_to_audio\`；卸载时会提示并删除该目录。覆盖安装 / 升级不会清配置。`dist_installer\` 已在 `.gitignore` 中。
 
 ---
 
