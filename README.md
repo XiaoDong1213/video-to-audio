@@ -174,7 +174,7 @@ build_exe.bat
 
 需要 **32 位** Python 3.8–3.10，以及已同步的 `resources\ffmpeg_x86\`。
 
-`build_exe_x86.bat` 默认使用本机路径 `D:\Python-32\python.exe`。换电脑时打开该 bat，把开头的 `PYTHON=` 改成你的 32 位解释器路径，例如：
+`build_exe_x86.bat` 默认使用本机路径 `D:\Python38-32\python.exe`（Windows 7 须用 32 位 Python 3.8）。换电脑时打开该 bat，把开头的 `PYTHON=` 改成你的 32 位解释器路径，例如：
 
 ```bat
 set "PYTHON=C:\Path\to\python.exe"

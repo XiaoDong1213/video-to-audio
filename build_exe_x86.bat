@@ -9,12 +9,12 @@ echo   For old 32-bit Windows
 echo ========================================
 echo.
 
-set "PYTHON=D:\Python-32\python.exe"
+set "PYTHON=D:\Python38-32\python.exe"
 if not exist "%PYTHON%" set "PYTHON=python"
 
 "%PYTHON%" --version >nul 2>nul
 if errorlevel 1 (
-    echo [ERROR] 32-bit Python not found: D:\Python-32\python.exe
+    echo [ERROR] 32-bit Python not found: D:\Python38-32\python.exe
     pause
     exit /b 1
 )
