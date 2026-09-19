@@ -9,17 +9,12 @@ echo   For old 32-bit Windows
 echo ========================================
 echo.
 
-set "PYTHON="
-if exist "C:\Python310-32\python.exe" set "PYTHON=C:\Python310-32\python.exe"
-if exist "C:\Python39-32\python.exe" set "PYTHON=C:\Python39-32\python.exe"
-if "%PYTHON%"=="" set "PYTHON=python"
+set "PYTHON=D:\Python-32\python.exe"
+if not exist "%PYTHON%" set "PYTHON=python"
 
 "%PYTHON%" --version >nul 2>nul
 if errorlevel 1 (
-    echo [ERROR] 32-bit Python not found.
-    echo Install Python 3.8-3.10 Windows x86, then:
-    echo   set PYTHON=C:\Path\to\python.exe
-    echo   build_exe_x86.bat
+    echo [ERROR] 32-bit Python not found: D:\Python-32\python.exe
     pause
     exit /b 1
 )

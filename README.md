@@ -174,9 +174,10 @@ build_exe.bat
 
 ```bat
 sync_ffmpeg_x86.bat
-set PYTHON=C:\Python310-32\python.exe
 build_exe_x86.bat
 ```
+
+脚本使用 `D:\Python-32\python.exe`。
 
 输出：`dist\Video to audio_x86\`
 
