@@ -19,7 +19,7 @@ from core.converter import (
     write_failure_log,
 )
 from core.formats import MP3_QUALITY_LABELS, OUTPUT_FORMATS, describe_mp3_quality
-from core.paths import app_icon_path, bundled_ffmpeg_dir, data_dir
+from core.paths import bundled_ffmpeg_dir, data_dir, load_app_icon
 from core.utils import (
     FFmpegNotFoundError,
     collect_audio_files,
@@ -27,8 +27,10 @@ from core.utils import (
     ensure_ffmpeg,
     ffmpeg_version,
 )
+from ui.toast import show_corner_toast
 from ui.qtcompat import (
     AlignCenter,
+    AlignVCenter,
     ExtendedSelection,
     PointingHandCursor,
     QButtonGroup,
@@ -37,7 +39,6 @@ from ui.qtcompat import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
-    QIcon,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -142,11 +143,9 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(APP_NAME)
-        icon = app_icon_path().resolve()
-        if icon.is_file():
-            qicon = QIcon(str(icon))
-            if not qicon.isNull():
-                self.setWindowIcon(qicon)
+        qicon = load_app_icon()
+        if not qicon.isNull():
+            self.setWindowIcon(qicon)
         self.resize(1280, 920)
         self.setMinimumSize(1100, 820)
 
@@ -178,6 +177,7 @@ class MainWindow(QMainWindow):
         self.config.last_quality = self._quality_key()
         self.config.last_output_dir = self.outdir_edit.text().strip()
         self.config.overwrite = self.overwrite_check.isChecked()
+        self.config.auto_open_output = self.auto_open_check.isChecked()
         try:
             self.config.window_geometry = geometry_to_hex(self)
         except Exception:  # noqa: BLE001
@@ -199,6 +199,7 @@ class MainWindow(QMainWindow):
         if self.config.last_output_dir:
             self.outdir_edit.setText(self.config.last_output_dir)
         self.overwrite_check.setChecked(bool(self.config.overwrite))
+        self.auto_open_check.setChecked(bool(self.config.auto_open_output))
         if self.config.window_geometry:
             try:
                 geometry_from_hex(self, self.config.window_geometry)
@@ -219,7 +220,7 @@ class MainWindow(QMainWindow):
 
         body = QWidget()
         body_lay = QHBoxLayout(body)
-        body_lay.setContentsMargins(16, 12, 16, 8)
+        body_lay.setContentsMargins(16, 12, 16, 12)
         body_lay.setSpacing(12)
         body_lay.addWidget(self._build_file_panel(), 3)
         body_lay.addWidget(self._build_option_panel(), 2)
@@ -244,32 +245,15 @@ class MainWindow(QMainWindow):
         brand.addWidget(title)
         lay.addLayout(brand, 1)
 
-        # Compact file actions in header
-        self.header_actions = QFrame()
-        self.header_actions.setObjectName("headerActions")
-        ha = QHBoxLayout(self.header_actions)
-        ha.setContentsMargins(0, 0, 0, 0)
-        ha.setSpacing(6)
-        for text, slot, oid in (
-            ("添加文件", self._add_files, "headerBtn"),
-            ("添加文件夹", self._add_folder, "headerBtn"),
-            ("移除", self._remove_selected, "headerBtnGhost"),
-            ("清空", self._clear, "headerBtnGhost"),
-        ):
-            b = QPushButton(text)
-            b.setObjectName(oid)
-            b.setCursor(PointingHandCursor)
-            b.setFixedHeight(30)
-            b.clicked.connect(slot)
-            ha.addWidget(b)
-        lay.addWidget(self.header_actions)
-
         self.ffmpeg_badge = QLabel("检测 FFmpeg…")
         self.ffmpeg_badge.setObjectName("badgePill")
+        self.ffmpeg_badge.setFixedHeight(36)
+        self.ffmpeg_badge.setAlignment(AlignCenter)
         lay.addWidget(self.ffmpeg_badge)
 
         mode_wrap = QFrame()
         mode_wrap.setObjectName("modeTrack")
+        mode_wrap.setFixedHeight(36)
         mode_box = QHBoxLayout(mode_wrap)
         mode_box.setContentsMargins(4, 4, 4, 4)
         mode_box.setSpacing(2)
@@ -297,17 +281,40 @@ class MainWindow(QMainWindow):
         panel = QFrame()
         panel.setObjectName("panel")
         lay = QVBoxLayout(panel)
-        lay.setContentsMargins(14, 14, 14, 14)
+        lay.setContentsMargins(14, 14, 14, 16)
         lay.setSpacing(10)
 
         top = QHBoxLayout()
+        top.setContentsMargins(0, 2, 0, 2)
+        top.setSpacing(8)
         self.file_title = QLabel("预览 / 裁剪")
         self.file_title.setObjectName("sectionTitle")
-        self.file_count = QLabel("0")
+        self.file_count = QLabel("0 个")
         self.file_count.setObjectName("countBadge")
-        top.addWidget(self.file_title)
-        top.addWidget(self.file_count)
+        self.file_count.setFixedHeight(36)
+        self.file_count.setAlignment(AlignCenter)
+        top.addWidget(self.file_title, 0, AlignVCenter)
+        top.addWidget(self.file_count, 0, AlignVCenter)
         top.addStretch(1)
+
+        self.panel_actions = QFrame()
+        self.panel_actions.setObjectName("headerActions")
+        ha = QHBoxLayout(self.panel_actions)
+        ha.setContentsMargins(0, 0, 0, 0)
+        ha.setSpacing(6)
+        for text, slot, oid in (
+            ("添加文件", self._add_files, "headerBtn"),
+            ("添加文件夹", self._add_folder, "headerBtn"),
+            ("移除", self._remove_selected, "headerBtnGhost"),
+            ("清空", self._clear, "headerBtnGhost"),
+        ):
+            b = QPushButton(text)
+            b.setObjectName(oid)
+            b.setCursor(PointingHandCursor)
+            b.setFixedHeight(36)
+            b.clicked.connect(slot)
+            ha.addWidget(b)
+        top.addWidget(self.panel_actions, 0, AlignVCenter)
         lay.addLayout(top)
 
         # Queue column (beside video in convert mode)
@@ -404,8 +411,10 @@ class MainWindow(QMainWindow):
 
         self.copy_check = QCheckBox("直接拷贝音轨（不重新编码）")
         self.overwrite_check = QCheckBox("覆盖已存在的输出文件")
+        self.auto_open_check = QCheckBox("完成后自动打开输出目录")
         lay.addWidget(self.copy_check)
         lay.addWidget(self.overwrite_check)
+        lay.addWidget(self.auto_open_check)
 
         self.outdir_edit = QLineEdit()
         self.outdir_edit.setPlaceholderText("留空则与源文件同目录")
@@ -451,7 +460,7 @@ class MainWindow(QMainWindow):
         footer = QFrame()
         footer.setObjectName("footerBar")
         lay = QVBoxLayout(footer)
-        lay.setContentsMargins(20, 10, 20, 12)
+        lay.setContentsMargins(20, 12, 20, 14)
         lay.setSpacing(8)
 
         self.progress_text = QLabel("就绪")
@@ -768,7 +777,7 @@ class MainWindow(QMainWindow):
             self.config.last_output_dir = folder
             self._persist_config()
 
-    def _open_outdir(self) -> None:
+    def _open_outdir(self, *, quiet: bool = False) -> None:
         raw = self.outdir_edit.text().strip()
         if raw:
             path = Path(raw)
@@ -778,7 +787,8 @@ class MainWindow(QMainWindow):
             remembered = existing_dir(self.config.last_output_dir)
             path = Path(remembered) if remembered else Path.cwd()
         if not path.exists():
-            QMessageBox.information(self, "提示", f"目录不存在：{path}")
+            if not quiet:
+                QMessageBox.information(self, "提示", f"目录不存在：{path}")
             return
         if sys.platform == "win32":
             os.startfile(path)  # type: ignore[attr-defined]
@@ -786,6 +796,21 @@ class MainWindow(QMainWindow):
             subprocess.run(["open", str(path)], check=False)
         else:
             subprocess.run(["xdg-open", str(path)], check=False)
+
+    def _maybe_auto_open(self, file_path: Path | None = None) -> None:
+        if not self.auto_open_check.isChecked():
+            return
+        if file_path is not None:
+            folder = file_path if file_path.is_dir() else file_path.parent
+            if folder.is_dir():
+                if sys.platform == "win32":
+                    os.startfile(folder)  # type: ignore[attr-defined]
+                elif sys.platform == "darwin":
+                    subprocess.run(["open", str(folder)], check=False)
+                else:
+                    subprocess.run(["xdg-open", str(folder)], check=False)
+                return
+        self._open_outdir(quiet=True)
 
     def _base_convert_options(self) -> ConvertOptions:
         rate_raw = self.rate_edit.text().strip()
@@ -887,7 +912,11 @@ class MainWindow(QMainWindow):
         if log_path:
             msg += f"\n失败日志：{log_path}"
         self._append_log(msg)
-        QMessageBox.information(self, "转换完成", msg)
+        kind = "error" if report.failed else "ok"
+        title = "转换完成" if kind == "ok" else "转换未完成"
+        show_corner_toast(title, msg.replace("\n", " "), kind=kind)
+        if report.succeeded:
+            self._maybe_auto_open()
 
     def _start_merge(self) -> None:
         if len(self._paths) < 2:
@@ -918,14 +947,14 @@ class MainWindow(QMainWindow):
         assert isinstance(result, ConvertResult)
         self._set_progress(1.0, "合并完成" if result.ok else "合并失败")
         if result.ok:
-            msg = f"合并成功：\n{result.output_path}"
             self._append_log(f"[成功] → {result.output_path}")
-            QMessageBox.information(self, "合并完成", msg)
+            show_corner_toast("合并完成", str(result.output_path), kind="ok")
+            self._maybe_auto_open(result.output_path)
         else:
             tail = result.message.splitlines()[-1] if result.message else "未知错误"
             self._append_log("[失败] " + tail)
-            QMessageBox.critical(self, "合并失败", tail)
+            show_corner_toast("合并失败", tail, kind="error")
 
     def _on_worker_failed(self, message: str) -> None:
         self._append_log("[异常] " + message)
-        QMessageBox.critical(self, "错误", message)
+        show_corner_toast("出错了", message, kind="error")

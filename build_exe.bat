@@ -1,9 +1,10 @@
 @echo off
 setlocal EnableExtensions
+chcp 65001 >nul
 cd /d "%~dp0"
 
 echo ========================================
-echo   Video to audio Build — x64 (PyQt6)
+echo   Video to audio Build - x64 (PyQt6)
 echo ========================================
 echo.
 
@@ -19,18 +20,21 @@ if errorlevel 1 (
 
 "%PYTHON%" -c "import sys; raise SystemExit(0 if sys.maxsize>2**32 else 1)"
 if errorlevel 1 (
-    echo [ERROR] Need 64-bit Python for this build. Use build_exe_x86.bat for 32-bit.
+    echo [ERROR] Need 64-bit Python. Use build_exe_x86.bat for 32-bit.
     pause
     exit /b 1
 )
 
 if not exist "resources\ffmpeg\ffmpeg.exe" (
-    echo [ERROR] Missing resources\ffmpeg\ffmpeg.exe — run sync_ffmpeg.bat
+    echo [ERROR] Missing resources\ffmpeg\ffmpeg.exe
+    echo Download: https://github.com/BtbN/FFmpeg-Builds/releases
+    echo Then run sync_ffmpeg.bat
     pause
     exit /b 1
 )
 if not exist "resources\ffmpeg\ffprobe.exe" (
     echo [ERROR] Missing resources\ffmpeg\ffprobe.exe
+    echo Run sync_ffmpeg.bat
     pause
     exit /b 1
 )

@@ -98,13 +98,39 @@ def app_icon_path() -> Path:
     return resource_dir() / "icon.ico"
 
 
+def load_app_icon():
+    """Load ICO with size hints so Windows uses crisp glyphs (no upscale blur)."""
+    from ui.qtcompat import QT_API, QIcon
+
+    path = app_icon_path()
+    icon = QIcon()
+    if not path.is_file():
+        return icon
+    resolved = str(path.resolve())
+    try:
+        if QT_API == "pyqt6":
+            from PyQt6.QtCore import QSize
+        else:
+            from PyQt5.QtCore import QSize  # type: ignore
+
+        for size in (16, 20, 24, 32, 40, 48, 64, 128, 256):
+            icon.addFile(resolved, QSize(size, size))
+    except Exception:  # noqa: BLE001
+        icon = QIcon(resolved)
+    return icon
+
+
 def load_app_stylesheet() -> str:
     """Load QSS and inject absolute icon URLs (Qt needs real file paths)."""
     path = resource_path("styles", "app.qss")
     if not path.is_file():
         return ""
     text = path.read_text(encoding="utf-8")
-    arrow = resource_path("icons", "arrow-down.svg")
-    if arrow.is_file():
-        text = text.replace("{{ARROW_DOWN}}", f'"{arrow.resolve().as_posix()}"')
+    for key, name in (
+        ("{{ARROW_DOWN}}", "arrow-down.svg"),
+        ("{{CHECK_WHITE}}", "check-white.svg"),
+    ):
+        icon = resource_path("icons", name)
+        if icon.is_file():
+            text = text.replace(key, f'"{icon.resolve().as_posix()}"')
     return text

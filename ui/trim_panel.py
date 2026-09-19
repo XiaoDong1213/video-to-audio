@@ -21,7 +21,106 @@ from ui.qtcompat import (
     QWidget,
     load_media_player,
     pyqtSignal,
+    Qt,
 )
+
+
+def _left_button():
+    if QT_API == "pyqt6":
+        return Qt.MouseButton.LeftButton
+    return Qt.LeftButton
+
+
+def _event_x(event) -> float:
+    if hasattr(event, "position"):
+        return float(event.position().x())
+    return float(event.x())
+
+
+class JumpSlider(QSlider):
+    """Click or drag anywhere on the groove jumps to that value."""
+
+    def _value_at(self, event) -> int:
+        span = max(1, self.maximum() - self.minimum())
+        width = max(1, self.width() - 1)
+        ratio = min(1.0, max(0.0, _event_x(event) / width))
+        return int(round(self.minimum() + ratio * span))
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802, ANN001
+        if event.button() == _left_button():
+            self.setValue(self._value_at(event))
+            self.setSliderDown(True)
+            self.sliderPressed.emit()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802, ANN001
+        buttons = event.buttons() if hasattr(event, "buttons") else 0
+        if buttons & _left_button():
+            self.setValue(self._value_at(event))
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802, ANN001
+        if event.button() == _left_button():
+            self.setValue(self._value_at(event))
+            self.setSliderDown(False)
+            self.sliderReleased.emit()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+
+class PlayButton(QPushButton):
+    """Circular play/pause control with a centered glyph."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._playing = False
+        self.setText("")
+
+    def set_playing(self, playing: bool) -> None:
+        self._playing = bool(playing)
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802, ANN001
+        super().paintEvent(event)
+        if QT_API == "pyqt6":
+            from PyQt6.QtCore import QPointF, QRectF, Qt as _Qt
+            from PyQt6.QtGui import QColor, QPainter, QPolygonF
+        else:
+            from PyQt5.QtCore import QPointF, QRectF, Qt as _Qt  # type: ignore
+            from PyQt5.QtGui import QColor, QPainter, QPolygonF  # type: ignore
+
+        painter = QPainter(self)
+        painter.setRenderHint(
+            QPainter.RenderHint.Antialiasing
+            if hasattr(QPainter, "RenderHint")
+            else QPainter.Antialiasing
+        )
+        painter.setPen(_Qt.PenStyle.NoPen if hasattr(_Qt, "PenStyle") else _Qt.NoPen)
+        painter.setBrush(QColor("#FFFFFF"))
+        cx = self.width() / 2
+        cy = self.height() / 2
+        if self._playing:
+            bar_w, bar_h, gap = 3.0, 12.0, 4.0
+            left = cx - gap / 2 - bar_w
+            painter.drawRoundedRect(QRectF(left, cy - bar_h / 2, bar_w, bar_h), 1.2, 1.2)
+            painter.drawRoundedRect(QRectF(cx + gap / 2, cy - bar_h / 2, bar_w, bar_h), 1.2, 1.2)
+        else:
+            size = 8.0
+            painter.drawPolygon(
+                QPolygonF(
+                    [
+                        QPointF(cx - size * 0.28, cy - size),
+                        QPointF(cx - size * 0.28, cy + size),
+                        QPointF(cx + size * 0.85, cy),
+                    ]
+                )
+            )
+        painter.end()
 
 
 class TrimWorkspace(QWidget):
@@ -37,6 +136,9 @@ class TrimWorkspace(QWidget):
         self._end_ms = 0
         self._player = None
         self._dragging = False
+        self._range_preview = False
+        self._poster_pending = False
+        self._priming_poster = False
         self._media_ok = False
         self._suppress = False
         self._end_to_eof = True
@@ -99,7 +201,7 @@ class TrimWorkspace(QWidget):
         tl.setContentsMargins(12, 8, 12, 8)
         tl.setSpacing(10)
 
-        self._play_btn = QPushButton("▶")
+        self._play_btn = PlayButton()
         self._play_btn.setObjectName("playButton")
         self._play_btn.setCursor(PointingHandCursor)
         self._play_btn.setFixedSize(40, 40)
@@ -119,12 +221,14 @@ class TrimWorkspace(QWidget):
             b.clicked.connect(slot)
             tl.addWidget(b)
 
-        self._pos_slider = QSlider(Horizontal)
+        self._pos_slider = JumpSlider(Horizontal)
         self._pos_slider.setObjectName("seekSlider")
+        self._pos_slider.setMinimumHeight(22)
         self._pos_slider.setRange(0, 0)
         self._pos_slider.sliderPressed.connect(lambda: setattr(self, "_dragging", True))
         self._pos_slider.sliderReleased.connect(self._on_seek_release)
         self._pos_slider.sliderMoved.connect(self._on_seek_moved)
+        self._pos_slider.valueChanged.connect(self._on_pos_slider_value)
         tl.addWidget(self._pos_slider, 1)
 
         self._cur_label = QLabel("00:00.000")
@@ -146,7 +250,7 @@ class TrimWorkspace(QWidget):
         controls.setObjectName("trimControls")
         controls.setMinimumHeight(200)
         cl = QVBoxLayout(controls)
-        cl.setContentsMargins(0, 0, 0, 0)
+        cl.setContentsMargins(0, 4, 0, 6)
         cl.setSpacing(8)
 
         mark_row = QHBoxLayout()
@@ -172,7 +276,9 @@ class TrimWorkspace(QWidget):
         start_lab = QLabel("入点")
         start_lab.setObjectName("fieldLabel")
         start_lab.setFixedWidth(36)
-        self._start_slider = QSlider(Horizontal)
+        self._start_slider = JumpSlider(Horizontal)
+        self._start_slider.setObjectName("trimSlider")
+        self._start_slider.setMinimumHeight(22)
         self._start_slider.valueChanged.connect(self._on_start_changed)
         self._start_edit = QLineEdit("00:00.000")
         self._start_edit.setPlaceholderText("00:00.000")
@@ -188,7 +294,9 @@ class TrimWorkspace(QWidget):
         end_lab = QLabel("出点")
         end_lab.setObjectName("fieldLabel")
         end_lab.setFixedWidth(36)
-        self._end_slider = QSlider(Horizontal)
+        self._end_slider = JumpSlider(Horizontal)
+        self._end_slider.setObjectName("trimSlider")
+        self._end_slider.setMinimumHeight(22)
         self._end_slider.valueChanged.connect(self._on_end_changed)
         self._end_edit = QLineEdit("")
         self._end_edit.setPlaceholderText("留空=到结尾")
@@ -263,11 +371,37 @@ class TrimWorkspace(QWidget):
             self._player.durationChanged.connect(self._on_duration)
             self._player.positionChanged.connect(self._on_position)
             self._player.playbackStateChanged.connect(self._on_state)
+            self._player.mediaStatusChanged.connect(self._on_media_status)
         else:
             self._player.durationChanged.connect(self._on_duration)
             self._player.positionChanged.connect(self._on_position)
             self._player.stateChanged.connect(self._on_state_pyqt5)
+            self._player.mediaStatusChanged.connect(self._on_media_status)
         self._media_ok = True
+
+    def _on_media_status(self, status: int) -> None:
+        """Decode one frame after load so the preview is not a black box."""
+        if not self._poster_pending or self._player is None:
+            return
+        if QT_API == "pyqt6":
+            from PyQt6.QtMultimedia import QMediaPlayer
+
+            ready = status in (
+                QMediaPlayer.MediaStatus.LoadedMedia,
+                QMediaPlayer.MediaStatus.BufferedMedia,
+            )
+        else:
+            from PyQt5.QtMultimedia import QMediaPlayer  # type: ignore
+
+            ready = status in (QMediaPlayer.LoadedMedia, QMediaPlayer.BufferedMedia)
+        if not ready:
+            return
+        self._poster_pending = False
+        self._priming_poster = False
+        # Seek only. play() on a long file blocks the UI and flashes the button.
+        self._player.pause()
+        self._player.setPosition(0)
+        self._play_btn.set_playing(False)
 
     def clear(self) -> None:
         self._stop_player()
@@ -321,7 +455,8 @@ class TrimWorkspace(QWidget):
         self._pending_start = start
         self._pending_end = end
         self._suppress = False
-        self._play_btn.setText("▶")
+        self._play_btn.set_playing(False)
+        self._poster_pending = True
 
         if not self._media_ok or self._player is None or self._video is None:
             if self._video is not None:
@@ -416,41 +551,61 @@ class TrimWorkspace(QWidget):
             self._refresh_range_labels()
 
     def _on_position(self, pos: int) -> None:
+        pos = int(pos)
+        if self._range_preview and not self._end_to_eof and pos >= self._end_ms:
+            self._range_preview = False
+            if self._player is not None:
+                self._player.pause()
+                self._player.setPosition(self._end_ms)
+            pos = self._end_ms
         if not self._dragging:
             self._pos_slider.blockSignals(True)
-            self._pos_slider.setValue(int(pos))
+            self._pos_slider.setValue(pos)
             self._pos_slider.blockSignals(False)
-        self._cur_label.setText(ms_to_stamp(int(pos)))
+        self._cur_label.setText(ms_to_stamp(pos))
 
     def _on_state(self, state) -> None:  # noqa: ANN001
         from PyQt6.QtMultimedia import QMediaPlayer
 
         playing = state == QMediaPlayer.PlaybackState.PlayingState
-        self._play_btn.setText("⏸" if playing else "▶")
+        self._play_btn.set_playing(playing)
 
     def _on_state_pyqt5(self, state: int) -> None:
         from PyQt5.QtMultimedia import QMediaPlayer  # type: ignore
 
         playing = state == QMediaPlayer.PlayingState
-        self._play_btn.setText("⏸" if playing else "▶")
+        self._play_btn.set_playing(playing)
 
     def _toggle_play(self) -> None:
         if self._player is None:
             return
+        playing = self._is_playing()
+        if playing:
+            self._range_preview = False
+            self._player.pause()
+            return
+        if self._has_trim_range():
+            self._range_preview = True
+            self._player.setPosition(self._start_ms)
+        else:
+            self._range_preview = False
+        self._player.play()
+
+    def _is_playing(self) -> bool:
+        if self._player is None:
+            return False
         if QT_API == "pyqt6":
             from PyQt6.QtMultimedia import QMediaPlayer
 
-            if self._player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
-                self._player.pause()
-            else:
-                self._player.play()
-        else:
-            from PyQt5.QtMultimedia import QMediaPlayer  # type: ignore
+            return self._player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        from PyQt5.QtMultimedia import QMediaPlayer  # type: ignore
 
-            if self._player.state() == QMediaPlayer.PlayingState:
-                self._player.pause()
-            else:
-                self._player.play()
+        return self._player.state() == QMediaPlayer.PlayingState
+
+    def _has_trim_range(self) -> bool:
+        if self._duration <= 0:
+            return False
+        return self._start_ms > 0 or not self._end_to_eof
 
     def _nudge(self, delta_ms: int) -> None:
         if self._player is None or self._duration <= 0:
@@ -461,8 +616,14 @@ class TrimWorkspace(QWidget):
     def _on_seek_moved(self, value: int) -> None:
         self._cur_label.setText(ms_to_stamp(value))
 
+    def _on_pos_slider_value(self, value: int) -> None:
+        self._cur_label.setText(ms_to_stamp(int(value)))
+        if self._player is not None and self._dragging:
+            self._player.setPosition(int(value))
+
     def _on_seek_release(self) -> None:
         self._dragging = False
+        self._range_preview = False
         if self._player is not None:
             self._player.setPosition(self._pos_slider.value())
 

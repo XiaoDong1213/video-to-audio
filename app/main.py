@@ -64,9 +64,9 @@ def _install_excepthook() -> None:
 def _run_gui() -> int:
     from app.i18n import install_qt_zh
     from app.identity import APP_NAME
-    from core.paths import app_icon_path, load_app_stylesheet
+    from core.paths import load_app_icon, load_app_stylesheet
     from ui.main_window import MainWindow
-    from ui.qtcompat import QT_API, QApplication, QIcon, app_exec
+    from ui.qtcompat import QT_API, QApplication, app_exec
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
@@ -76,9 +76,7 @@ def _run_gui() -> int:
     install_qt_zh(app)
     app.setStyleSheet(load_app_stylesheet())
 
-    # Absolute path + multi-size .ico so Windows taskbar / Alt-Tab pick a real glyph
-    icon_file = app_icon_path().resolve()
-    app_icon = QIcon(str(icon_file)) if icon_file.is_file() else QIcon()
+    app_icon = load_app_icon()
     if not app_icon.isNull():
         app.setWindowIcon(app_icon)
 

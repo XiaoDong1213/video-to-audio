@@ -16,6 +16,7 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
         last_format="wav",
         last_quality="high",
         overwrite=True,
+        auto_open_output=True,
     )
     (tmp_path / "videos").mkdir()
     save_config(cfg, path)
@@ -24,6 +25,7 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
     assert loaded.config.last_format == "wav"
     assert loaded.config.last_quality == "high"
     assert loaded.config.overwrite is True
+    assert loaded.config.auto_open_output is True
     assert existing_dir(loaded.config.last_video_dir) == str(tmp_path / "videos")
     assert existing_dir(loaded.config.last_audio_dir) == ""
 

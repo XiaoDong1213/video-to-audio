@@ -43,6 +43,7 @@ try:
     AlignCenter = Qt.AlignmentFlag.AlignCenter
     AlignVCenter = Qt.AlignmentFlag.AlignVCenter
     AlignRight = Qt.AlignmentFlag.AlignRight
+    AlignTop = Qt.AlignmentFlag.AlignTop
     PointingHandCursor = Qt.CursorShape.PointingHandCursor
     ExtendedSelection = QListWidget.SelectionMode.ExtendedSelection
     Horizontal = Qt.Orientation.Horizontal
@@ -97,6 +98,7 @@ except ImportError:  # pragma: no cover
     AlignCenter = Qt.AlignCenter
     AlignVCenter = Qt.AlignVCenter
     AlignRight = Qt.AlignRight
+    AlignTop = Qt.AlignTop
     PointingHandCursor = Qt.PointingHandCursor
     ExtendedSelection = QListWidget.ExtendedSelection
     Horizontal = Qt.Horizontal
@@ -180,6 +182,7 @@ __all__ = [
     "AlignCenter",
     "AlignVCenter",
     "AlignRight",
+    "AlignTop",
     "PointingHandCursor",
     "ExtendedSelection",
     "Horizontal",

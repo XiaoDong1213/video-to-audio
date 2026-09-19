@@ -1,9 +1,10 @@
 @echo off
 setlocal EnableExtensions
+chcp 65001 >nul
 cd /d "%~dp0"
 
 echo ========================================
-echo   Video to audio Build — x86 (PyQt5)
+echo   Video to audio Build - x86 (PyQt5)
 echo   For old 32-bit Windows
 echo ========================================
 echo.
@@ -32,12 +33,14 @@ if errorlevel 1 (
 
 if not exist "resources\ffmpeg_x86\ffmpeg.exe" (
     echo [ERROR] Missing resources\ffmpeg_x86\ffmpeg.exe
-    echo Place 32-bit ffmpeg here, or run sync_ffmpeg_x86.bat
+    echo Download: https://github.com/defisym/FFmpeg-Builds-Win32/releases
+    echo Pick a win32-gpl zip, then run sync_ffmpeg_x86.bat
     pause
     exit /b 1
 )
 if not exist "resources\ffmpeg_x86\ffprobe.exe" (
     echo [ERROR] Missing resources\ffmpeg_x86\ffprobe.exe
+    echo Run sync_ffmpeg_x86.bat
     pause
     exit /b 1
 )

@@ -20,6 +20,7 @@ class AppConfig:
     last_quality: str = "medium"  # high / medium / low
     window_geometry: str = ""  # base64 from QByteArray or hex
     overwrite: bool = False
+    auto_open_output: bool = False
 
     @classmethod
     def default(cls) -> AppConfig:

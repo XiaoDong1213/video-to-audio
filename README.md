@@ -99,6 +99,39 @@ video-to-audio/
 
 ---
 
+## 准备 FFmpeg（仓库不含 exe）
+
+体积大，exe **不进 Git**。开发 / 打包前自己下载一次，拷进 `resources\`。
+
+### 64 位（日常开发 + `build_exe.bat`）
+
+1. 打开发布页：[BtbN/FFmpeg-Builds Releases](https://github.com/BtbN/FFmpeg-Builds/releases)
+2. 下载其一：
+   - `ffmpeg-master-latest-win64-gpl-shared.zip`（较小，推荐）
+   - `ffmpeg-master-latest-win64-gpl.zip`（静态）
+3. 解压，找到含 `ffmpeg.exe` / `ffprobe.exe` 的目录（多为 `bin`）
+4. 在项目根目录运行：
+
+```bat
+sync_ffmpeg.bat
+```
+
+脚本若在 PATH 里找到 ffmpeg 会自动拷贝；否则按提示粘贴上面的目录。完成后应有 `resources\ffmpeg\ffmpeg.exe` 与 `ffprobe.exe`。
+
+### 32 位（仅打老系统包时需要）
+
+1. 打开发布页：[defisym/FFmpeg-Builds-Win32 Releases](https://github.com/defisym/FFmpeg-Builds-Win32/releases)
+2. 下载文件名含 **`win32-gpl`** 的 zip（不要选 win64）
+3. 解压后运行：
+
+```bat
+sync_ffmpeg_x86.bat
+```
+
+按提示粘贴含两个 exe 的目录。完成后应有 `resources\ffmpeg_x86\ffmpeg.exe` 与 `ffprobe.exe`。
+
+---
+
 ## 从源码运行
 
 ### 环境
@@ -106,8 +139,7 @@ video-to-audio/
 - Windows
 - Python 3.10+（64 位开发推荐）
 - PyQt6
-
-安装依赖并同步 64 位 FFmpeg：
+- 已按上文准备好 64 位 FFmpeg
 
 ```bash
 pip install -r requirements.txt
@@ -121,6 +153,8 @@ python main.py
 
 ## Windows EXE 打包
 
+发布包会把 `resources\ffmpeg*` 里的 exe **打进安装目录**，目标机不用再装 FFmpeg。
+
 ### x64（Win10 / 11）
 
 ```bat
@@ -132,7 +166,7 @@ build_exe.bat
 
 ### x86（老款 32 位 Windows）
 
-需要 32 位 Python 3.8–3.10，以及 `resources\ffmpeg_x86\` 中的 32 位 FFmpeg：
+需要 32 位 Python 3.8–3.10，以及已同步的 `resources\ffmpeg_x86\`：
 
 ```bat
 sync_ffmpeg_x86.bat
@@ -163,10 +197,17 @@ build_exe_x86.bat
 
 Video to audio 项目代码采用 **MIT License**。
 
+### 项目贡献者
+
+- **XiaoDong**
+- **JiangRTTTR**
+
+### 项目版权
+
 ```text
-Copyright © 2026 XiaoDong
+Copyright © 2026 XiaoDong and JiangRTTTR
 ```
 
-详细条款见根目录 `LICENSE`。
+详细许可条款请参阅项目根目录下的 `LICENSE` 文件。
 
-内置 FFmpeg 有独立许可证，使用时请遵守其 GPL / LGPL 等条款。
+> 本项目中内置的 FFmpeg，以及字体、图标等第三方资源，其版权归相应权利人所有。第三方资源不属于本项目代码许可证的授权范围，具体使用权限请以其各自的许可证或版权声明为准。

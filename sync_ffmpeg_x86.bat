@@ -1,24 +1,30 @@
 @echo off
 setlocal EnableExtensions
+chcp 65001 >nul
 cd /d "%~dp0"
 
 echo ========================================
-echo  Sync 32-bit FFmpeg into resources\ffmpeg_x86
+echo  Sync 32-bit FFmpeg -^> resources\ffmpeg_x86
 echo ========================================
 echo.
-echo PATH 上的 ffmpeg 通常是 64 位，请手动指定 32 位构建目录。
-echo 目录内需包含 ffmpeg.exe 与 ffprobe.exe
+echo Download (GitHub):
+echo   https://github.com/defisym/FFmpeg-Builds-Win32/releases
+echo Pick a zip with win32-gpl in the name (NOT win64).
+echo Unzip, then paste the folder that contains ffmpeg.exe.
+echo.
+echo Do NOT copy a 64-bit build here.
 echo.
 
 set "DEST=%~dp0resources\ffmpeg_x86"
 if not exist "%DEST%" mkdir "%DEST%"
 
-set /p "SRC=32-bit FFmpeg folder: "
+set /p "SRC=32-bit FFmpeg folder (with ffmpeg.exe): "
 if "%SRC%"=="" (
     echo Cancelled.
     pause
     exit /b 1
 )
+if "%SRC:~-1%"=="\" set "SRC=%SRC:~0,-1%"
 if not exist "%SRC%\ffmpeg.exe" (
     echo [ERROR] %SRC%\ffmpeg.exe not found
     pause
@@ -32,8 +38,9 @@ if not exist "%SRC%\ffprobe.exe" (
 
 copy /Y "%SRC%\ffmpeg.exe" "%DEST%\ffmpeg.exe" >nul
 copy /Y "%SRC%\ffprobe.exe" "%DEST%\ffprobe.exe" >nul
-echo Copied to %DEST%
-dir "%DEST%"
+echo Copied from: %SRC%
+echo Into:        %DEST%
+dir "%DEST%\ffmpeg.exe" "%DEST%\ffprobe.exe"
 echo.
 pause
 endlocal

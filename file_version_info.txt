@@ -12,14 +12,14 @@ VSVersionInfo(
   kids=[
     StringFileInfo([
       StringTable('040904B0', [
-        StringStruct('CompanyName', 'XiaoDong'),
+        StringStruct('CompanyName', 'XiaoDong & JiangRTTTR'),
         StringStruct('FileDescription', 'Video to audio'),
         StringStruct('FileVersion', '1.4.0'),
         StringStruct('InternalName', 'Video to audio'),
         StringStruct('OriginalFilename', 'Video to audio.exe'),
         StringStruct('ProductName', 'Video to audio'),
         StringStruct('ProductVersion', '1.4.0'),
-        StringStruct('LegalCopyright', 'Copyright (c) 2026 XiaoDong'),
+        StringStruct('LegalCopyright', 'Copyright (c) 2026 XiaoDong and JiangRTTTR'),
       ])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])

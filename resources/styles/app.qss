@@ -43,23 +43,84 @@ QLabel#trimSummary {
     background: #F8FAFC;
     border: 1px solid #E2E8F0;
     border-radius: 8px;
-    padding: 8px 10px;
+    padding: 10px 12px;
     font-size: 12px;
+    margin-bottom: 2px;
 }
 
 QLabel#badgePill {
     background: #F0F9FF;
     color: #0369A1;
     border: 1px solid #BAE6FD;
-    border-radius: 999px;
-    padding: 4px 10px;
-    font-size: 11px;
+    border-radius: 6px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    min-height: 36px;
+    max-height: 36px;
 }
 
 QLabel#badgePill[status="error"] {
     background: #FEF2F2;
     color: #B91C1C;
     border-color: #FECACA;
+}
+
+QFrame#cornerToast {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    border-radius: 12px;
+}
+
+QFrame#cornerToast[kind="ok"] {
+    background: #F0FDF4;
+    border-color: #BBF7D0;
+}
+
+QFrame#cornerToast[kind="error"] {
+    background: #FEF2F2;
+    border-color: #FECACA;
+}
+
+QLabel#cornerToastIcon {
+    color: #16A34A;
+    font-size: 22px;
+    font-weight: 700;
+    min-width: 28px;
+    max-width: 28px;
+}
+
+QLabel#cornerToastIcon[kind="error"] {
+    color: #DC2626;
+}
+
+QLabel#cornerToastTitle {
+    color: #0F172A;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+QLabel#cornerToastBody {
+    color: #475569;
+    font-size: 12px;
+}
+
+QPushButton#cornerToastClose {
+    background: transparent;
+    border: none;
+    color: #64748B;
+    font-size: 16px;
+    font-weight: 700;
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    padding: 0;
+    border-radius: 6px;
+}
+
+QPushButton#cornerToastClose:hover {
+    color: #0F172A;
+    background: #E2E8F0;
 }
 
 QLabel#emptyState {
@@ -75,12 +136,15 @@ QFrame#panel {
 }
 
 QLabel#countBadge {
-    background: #E0F2FE;
+    background: #F0F9FF;
+    border: 1px solid #7DD3FC;
     color: #0369A1;
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-size: 12px;
     font-weight: 600;
+    font-size: 12px;
+    border-radius: 6px;
+    padding: 0 12px;
+    min-height: 36px;
+    max-height: 36px;
 }
 
 QFrame#queuePanel {
@@ -167,32 +231,37 @@ QLabel#videoPlaceholder {
 
 QPushButton#headerBtn {
     background: #F0F9FF;
-    border: 1px solid #BAE6FD;
+    border: 1px solid #7DD3FC;
     color: #0369A1;
     font-weight: 600;
     font-size: 12px;
     border-radius: 6px;
-    padding: 4px 10px;
-    min-height: 28px;
+    padding: 0 12px;
+    min-height: 36px;
+    max-height: 36px;
 }
 
 QPushButton#headerBtn:hover {
     background: #E0F2FE;
+    border-color: #38BDF8;
 }
 
 QPushButton#headerBtnGhost {
     background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    color: #64748B;
+    border: 1px solid #CBD5E1;
+    color: #475569;
     font-size: 12px;
+    font-weight: 600;
     border-radius: 6px;
-    padding: 4px 10px;
-    min-height: 28px;
+    padding: 0 12px;
+    min-height: 36px;
+    max-height: 36px;
 }
 
 QPushButton#headerBtnGhost:hover {
     background: #F8FAFC;
     color: #0F172A;
+    border-color: #94A3B8;
 }
 
 QPushButton#queueMoveBtn {
@@ -273,10 +342,12 @@ QSlider#seekSlider::sub-page:horizontal {
 }
 
 QSlider#seekSlider::handle:horizontal {
-    width: 12px;
+    width: 14px;
+    height: 14px;
     margin: -5px 0;
     background: #F8FAFC;
-    border-radius: 6px;
+    border: 2px solid #38BDF8;
+    border-radius: 7px;
 }
 
 QFrame#trimControls {
@@ -381,7 +452,9 @@ QPushButton#modeButton {
     border: none;
     border-radius: 8px;
     min-width: 100px;
-    min-height: 32px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0 10px;
     color: #64748B;
 }
 
@@ -517,6 +590,7 @@ QCheckBox::indicator {
 QCheckBox::indicator:checked {
     background: #0284C7;
     border-color: #0284C7;
+    image: url({{CHECK_WHITE}});
 }
 
 QProgressBar {
@@ -546,22 +620,29 @@ QPlainTextEdit#logView {
     padding: 8px;
 }
 
+QSlider {
+    min-height: 22px;
+    max-height: 22px;
+}
+
 QSlider::groove:horizontal {
-    height: 6px;
+    height: 4px;
     background: #E2E8F0;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 
 QSlider::handle:horizontal {
     width: 14px;
+    height: 14px;
     margin: -5px 0;
     background: #0284C7;
+    border: 2px solid #FFFFFF;
     border-radius: 7px;
 }
 
 QSlider::sub-page:horizontal {
     background: #7DD3FC;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 
 QStatusBar {
