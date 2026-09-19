@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
+from typing import Any
 
 from core.formats import is_audio_file, is_video_file
 from core.paths import resolve_binary
@@ -12,6 +14,34 @@ from core.paths import resolve_binary
 
 class FFmpegNotFoundError(RuntimeError):
     """Raised when ffmpeg / ffprobe cannot be found (bundled or PATH)."""
+
+
+def _win_no_window_kwargs() -> dict[str, Any]:
+    """Avoid console flash when spawning ffmpeg/ffprobe from a GUI process."""
+    if sys.platform != "win32":
+        return {}
+    # CREATE_NO_WINDOW = 0x08000000
+    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+
+
+def run_hidden(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    """subprocess.run with Windows console hidden."""
+    merged = {
+        "capture_output": True,
+        "text": True,
+        "check": False,
+        "encoding": "utf-8",
+        "errors": "replace",
+        **_win_no_window_kwargs(),
+        **kwargs,
+    }
+    return subprocess.run(cmd, **merged)
+
+
+def popen_hidden(cmd: list[str], **kwargs: Any) -> subprocess.Popen[str]:
+    """subprocess.Popen with Windows console hidden."""
+    merged = {**_win_no_window_kwargs(), **kwargs}
+    return subprocess.Popen(cmd, **merged)
 
 
 def which_ffmpeg() -> str:
@@ -47,14 +77,7 @@ def ensure_ffmpeg() -> tuple[str, str | None]:
 
 def ffmpeg_version(ffmpeg: str | None = None) -> str:
     binary = ffmpeg or which_ffmpeg()
-    result = subprocess.run(
-        [binary, "-version"],
-        capture_output=True,
-        text=True,
-        check=False,
-        encoding="utf-8",
-        errors="replace",
-    )
+    result = run_hidden([binary, "-version"])
     first = (result.stdout or result.stderr or "").splitlines()
     return first[0] if first else "unknown"
 
@@ -70,6 +93,47 @@ def unique_output_path(path: Path) -> Path:
         if not candidate.exists():
             return candidate
         index += 1
+
+
+def parse_optional_positive_int(
+    raw: str,
+    label: str,
+    *,
+    maximum: int | None = None,
+) -> int | None:
+    """Parse a blank-or-positive-integer field. Raises ValueError with a user-facing message."""
+    text = raw.strip()
+    if not text:
+        return None
+    if not text.isdigit():
+        raise ValueError(f"{label}请填写正整数，或留空。")
+    value = int(text)
+    if value <= 0:
+        raise ValueError(f"{label}须为正整数。")
+    if maximum is not None and value > maximum:
+        raise ValueError(f"{label}不能大于 {maximum}。")
+    return value
+
+
+def move_selected(items: list, selected: list[int], delta: int) -> list[int] | None:
+    """Shift selected indexes by -1 or +1, keeping gaps. Mutates items. None if nothing moved."""
+    if delta not in (-1, 1) or not selected:
+        return None
+    count = len(items)
+    moving = set(selected)
+    order = sorted(moving) if delta < 0 else sorted(moving, reverse=True)
+    changed = False
+    for index in order:
+        target = index + delta
+        if target < 0 or target >= count or target in moving:
+            continue
+        items[index], items[target] = items[target], items[index]
+        moving.remove(index)
+        moving.add(target)
+        changed = True
+    if not changed:
+        return None
+    return sorted(moving)
 
 
 def collect_video_files(source: Path, *, recursive: bool = False) -> list[Path]:
@@ -145,14 +209,7 @@ def probe_duration_seconds(input_path: Path, ffprobe: str | None = None) -> floa
         str(input_path),
     ]
     try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-            encoding="utf-8",
-            errors="replace",
-        )
+        proc = run_hidden(cmd)
     except OSError:
         return None
     raw = (proc.stdout or "").strip()
@@ -183,14 +240,7 @@ def probe_audio_streams(input_path: Path, ffprobe: str | None = None) -> list[di
         "a",
         str(input_path),
     ]
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        check=False,
-        encoding="utf-8",
-        errors="replace",
-    )
+    result = run_hidden(cmd)
     if result.returncode != 0:
         return []
     try:

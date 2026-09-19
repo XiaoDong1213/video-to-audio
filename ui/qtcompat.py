@@ -1,5 +1,5 @@
 """
-Qt 兼容层：优先 PyQt6（64 位），回退 PyQt5（32 位老系统）。
+Qt 兼容层：32 位优先 PyQt5；64 位优先 PyQt6，再回退 PyQt5。
 """
 
 from __future__ import annotations
@@ -8,7 +8,19 @@ import sys
 
 QT_API: str
 
-try:
+
+def _load_pyqt6() -> None:
+    global QT_API
+    global Qt, QThread, QTimer, QUrl, pyqtSignal, QIcon
+    global QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox
+    global QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit
+    global QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPlainTextEdit
+    global QProgressBar, QPushButton, QSlider, QStatusBar, QVBoxLayout, QWidget
+    global AlignLeft, AlignCenter, AlignVCenter, AlignRight, AlignTop
+    global PointingHandCursor, ExtendedSelection, Horizontal, DialogAccepted
+    global LeftToRight, TopToBottom, ScrollBarAlwaysOff, ScrollBarAsNeeded, ScrollBarAlwaysOn
+    global app_exec, geometry_to_hex, geometry_from_hex
+
     from PyQt6.QtCore import Qt, QThread, QTimer, QUrl, pyqtSignal
     from PyQt6.QtGui import QIcon
     from PyQt6.QtWidgets import (
@@ -63,7 +75,19 @@ try:
     def geometry_from_hex(widget, hex_str: str) -> None:  # noqa: ANN001
         widget.restoreGeometry(bytes.fromhex(hex_str))
 
-except ImportError:  # pragma: no cover
+
+def _load_pyqt5() -> None:
+    global QT_API
+    global Qt, QThread, QTimer, QUrl, pyqtSignal, QIcon
+    global QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox
+    global QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit
+    global QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPlainTextEdit
+    global QProgressBar, QPushButton, QSlider, QStatusBar, QVBoxLayout, QWidget
+    global AlignLeft, AlignCenter, AlignVCenter, AlignRight, AlignTop
+    global PointingHandCursor, ExtendedSelection, Horizontal, DialogAccepted
+    global LeftToRight, TopToBottom, ScrollBarAlwaysOff, ScrollBarAsNeeded, ScrollBarAlwaysOn
+    global app_exec, geometry_to_hex, geometry_from_hex
+
     from PyQt5.QtCore import QByteArray, Qt, QThread, QTimer, QUrl, pyqtSignal  # type: ignore
     from PyQt5.QtGui import QIcon  # type: ignore
     from PyQt5.QtWidgets import (  # type: ignore
@@ -117,6 +141,20 @@ except ImportError:  # pragma: no cover
 
     def geometry_from_hex(widget, hex_str: str) -> None:  # noqa: ANN001
         widget.restoreGeometry(QByteArray(bytes.fromhex(hex_str)))
+
+
+# 32-bit: PyQt5 first (x86 package excludes PyQt6). 64-bit: PyQt6 then PyQt5.
+_prefer_pyqt5 = sys.maxsize <= 2**32
+if _prefer_pyqt5:
+    try:
+        _load_pyqt5()
+    except ImportError:  # pragma: no cover
+        _load_pyqt6()
+else:
+    try:
+        _load_pyqt6()
+    except ImportError:  # pragma: no cover
+        _load_pyqt5()
 
 
 def is_64bit() -> bool:

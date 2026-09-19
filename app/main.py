@@ -61,15 +61,37 @@ def _install_excepthook() -> None:
     sys.excepthook = hook
 
 
+def _prepare_high_dpi() -> None:
+    """Must run before Qt is imported. PyQt5 otherwise draws at 96 DPI on scaled displays."""
+    os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
+    os.environ.setdefault("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
+
+
+def _enable_qt5_high_dpi(qt_api: str, application_cls, qt_namespace) -> None:  # noqa: ANN001
+    if qt_api != "pyqt5":
+        return
+    application_cls.setAttribute(qt_namespace.AA_EnableHighDpiScaling, True)
+    application_cls.setAttribute(qt_namespace.AA_UseHighDpiPixmaps, True)
+    policy = getattr(qt_namespace, "HighDpiScaleFactorRoundingPolicy", None)
+    setter = getattr(application_cls, "setHighDpiScaleFactorRoundingPolicy", None)
+    if policy is not None and setter is not None:
+        setter(policy.PassThrough)
+
+
 def _run_gui() -> int:
+    _prepare_high_dpi()
+    from ui.qtcompat import QT_API, QApplication, Qt, app_exec
+
+    _enable_qt5_high_dpi(QT_API, QApplication, Qt)
+
     from app.i18n import install_qt_zh
-    from app.identity import APP_NAME
+    from app.identity import APP_NAME, APP_VERSION
     from core.paths import load_app_icon, load_app_stylesheet
     from ui.main_window import MainWindow
-    from ui.qtcompat import QT_API, QApplication, app_exec
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
     if hasattr(app, "setApplicationDisplayName"):
         app.setApplicationDisplayName(APP_NAME)
     app.setStyle("Fusion")

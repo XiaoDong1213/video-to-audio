@@ -1,5 +1,5 @@
-# 32-bit Windows（Win7 x86 等）专用依赖
-# 请使用 32 位 Python 3.8–3.10 安装：
+# 32-bit Windows (Win7 x86 etc.)
+# Use 32-bit Python 3.8-3.10:
 #   py -3.10-32 -m pip install -r requirements-x86.txt
 PyQt5>=5.15,<6
 typer>=0.12.0

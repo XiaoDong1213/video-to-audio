@@ -510,27 +510,27 @@ class TrimWorkspace(QWidget):
         if self._duration <= 0:
             return
         self._suppress = True
-        if start:
-            try:
-                ms = int(float(start) * 1000)
-                self._start_slider.setValue(max(0, min(self._duration, ms)))
-            except ValueError:
-                self._start_slider.setValue(0)
-        else:
-            self._start_slider.setValue(0)
-        if end:
-            self._end_to_eof = False
-            try:
-                ms = int(float(end) * 1000)
-                self._end_slider.setValue(max(0, min(self._duration, ms)))
-            except ValueError:
-                self._end_to_eof = True
-                self._end_slider.setValue(self._duration)
-        else:
+        self._start_slider.setValue(self._clip_pending_ms(start))
+        if not end:
             self._end_to_eof = True
             self._end_slider.setValue(self._duration)
+        else:
+            parsed = parse_time_to_ms(str(end))
+            if parsed is None:
+                self._end_to_eof = True
+                self._end_slider.setValue(self._duration)
+            else:
+                ms = max(0, min(self._duration, parsed))
+                self._end_to_eof = ms >= self._duration
+                self._end_slider.setValue(self._duration if self._end_to_eof else ms)
         self._suppress = False
         self._refresh_range_labels()
+
+    def _clip_pending_ms(self, value: object) -> int:
+        ms = parse_time_to_ms(str(value)) if value else None
+        if ms is None:
+            return 0
+        return max(0, min(self._duration, ms))
 
     def _on_duration(self, duration: int) -> None:
         if duration <= 0:

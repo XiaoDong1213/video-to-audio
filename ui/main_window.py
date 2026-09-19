@@ -26,6 +26,8 @@ from core.utils import (
     collect_video_files,
     ensure_ffmpeg,
     ffmpeg_version,
+    move_selected,
+    parse_optional_positive_int,
 )
 from ui.toast import show_corner_toast
 from ui.qtcompat import (
@@ -167,6 +169,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "配置提示", loaded.warning)
 
     def closeEvent(self, event) -> None:  # noqa: N802, ANN001
+        if self._worker is not None and self._worker.isRunning():
+            QMessageBox.information(self, "请稍候", "任务还在进行，完成后再关闭窗口。")
+            event.ignore()
+            return
         self._persist_config()
         if hasattr(self, "trim_workspace"):
             self.trim_workspace.clear()
@@ -710,7 +716,8 @@ class MainWindow(QMainWindow):
                         if self._mode == MODE_MERGE
                         else collect_video_files(path, recursive=True)
                     )
-                except Exception:
+                except (OSError, ValueError) as exc:
+                    self._append_log(f"跳过 {path.name}：{exc}")
                     continue
                 for f in found:
                     if f not in existing:
@@ -735,24 +742,20 @@ class MainWindow(QMainWindow):
         return sorted({i.row() for i in self.list_widget.selectedIndexes()})
 
     def _move_up(self) -> None:
-        rows = self._selected_rows()
-        if not rows or rows[0] == 0:
-            return
-        for i in rows:
-            self._paths[i - 1], self._paths[i] = self._paths[i], self._paths[i - 1]
-        self._refresh_list()
-        for i in rows:
-            self.list_widget.item(i - 1).setSelected(True)
+        self._shift_selection(-1)
 
     def _move_down(self) -> None:
-        rows = self._selected_rows()
-        if not rows or rows[-1] >= len(self._paths) - 1:
+        self._shift_selection(1)
+
+    def _shift_selection(self, delta: int) -> None:
+        selected = move_selected(self._paths, self._selected_rows(), delta)
+        if selected is None:
             return
-        for i in reversed(rows):
-            self._paths[i + 1], self._paths[i] = self._paths[i], self._paths[i + 1]
         self._refresh_list()
-        for i in rows:
-            self.list_widget.item(i + 1).setSelected(True)
+        for index in selected:
+            item = self.list_widget.item(index)
+            if item is not None:
+                item.setSelected(True)
 
     def _remove_selected(self) -> None:
         for i in reversed(self._selected_rows()):
@@ -813,15 +816,15 @@ class MainWindow(QMainWindow):
         self._open_outdir(quiet=True)
 
     def _base_convert_options(self) -> ConvertOptions:
-        rate_raw = self.rate_edit.text().strip()
-        ch_raw = self.channels_edit.text().strip()
         outdir_raw = self.outdir_edit.text().strip()
         fmt = self.format_combo.currentText()
         return ConvertOptions(
             format=fmt,
             quality=self._quality_key() if fmt == "mp3" else None,
-            sample_rate=int(rate_raw) if rate_raw else None,
-            channels=int(ch_raw) if ch_raw else None,
+            sample_rate=parse_optional_positive_int(
+                self.rate_edit.text(), "采样率", maximum=384000
+            ),
+            channels=parse_optional_positive_int(self.channels_edit.text(), "声道", maximum=8),
             copy_audio=self.copy_check.isChecked(),
             overwrite=self.overwrite_check.isChecked(),
             output_dir=Path(outdir_raw) if outdir_raw else None,
@@ -849,15 +852,15 @@ class MainWindow(QMainWindow):
         return jobs
 
     def _build_merge_options(self) -> MergeOptions:
-        rate_raw = self.rate_edit.text().strip()
-        ch_raw = self.channels_edit.text().strip()
         outdir_raw = self.outdir_edit.text().strip()
         fmt = self.format_combo.currentText()
         return MergeOptions(
             format=fmt,
             quality=self._quality_key() if fmt == "mp3" else None,
-            sample_rate=int(rate_raw) if rate_raw else None,
-            channels=int(ch_raw) if ch_raw else None,
+            sample_rate=parse_optional_positive_int(
+                self.rate_edit.text(), "采样率", maximum=384000
+            ),
+            channels=parse_optional_positive_int(self.channels_edit.text(), "声道", maximum=8),
             overwrite=self.overwrite_check.isChecked(),
             output_dir=Path(outdir_raw) if outdir_raw else None,
         )

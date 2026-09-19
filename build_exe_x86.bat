@@ -41,7 +41,20 @@ if not exist "resources\ffmpeg_x86\ffprobe.exe" (
 )
 
 echo Using: %PYTHON%
-"%PYTHON%" -m pip install -q -r requirements-x86.txt
+echo Installing dependencies...
+"%PYTHON%" -m pip install -r requirements-x86.txt
+if errorlevel 1 (
+    echo [ERROR] pip install failed. Fix requirements-x86.txt encoding / network, then retry.
+    pause
+    exit /b 1
+)
+
+"%PYTHON%" -c "import PyQt5; from PyQt5.QtWidgets import QApplication"
+if errorlevel 1 (
+    echo [ERROR] PyQt5 is not importable in this 32-bit Python. Cannot build x86 package.
+    pause
+    exit /b 1
+)
 
 "%PYTHON%" -m PyInstaller --version >nul 2>nul
 if errorlevel 1 (

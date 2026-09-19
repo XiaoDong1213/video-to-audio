@@ -22,8 +22,10 @@ from core.formats import (
 from core.utils import (
     default_output_for,
     ensure_ffmpeg,
+    popen_hidden,
     probe_audio_streams,
     probe_duration_seconds,
+    run_hidden,
     unique_output_path,
 )
 
@@ -258,16 +260,9 @@ def merge_files(
     if on_progress:
         on_progress(0.0, f"Merging {len(resolved)} files")
 
-    proc = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        check=False,
-        encoding="utf-8",
-        errors="replace",
-    )
+    proc = run_hidden(cmd)
 
-    label = Path(" + ".join(p.name for p in resolved[:3]) + ("…" if len(resolved) > 3 else ""))
+    label = " + ".join(p.name for p in resolved[:3]) + ("…" if len(resolved) > 3 else "")
 
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "ffmpeg failed").strip()
@@ -276,12 +271,12 @@ def merge_files(
             on_progress(1.0, "Failed")
         if output_path.exists() and output_path.stat().st_size == 0:
             output_path.unlink(missing_ok=True)
-        return ConvertResult(label, output_path, False, tail, proc.returncode)
+        return ConvertResult(resolved[0], output_path, False, f"{label}\n{tail}", proc.returncode)
 
     if on_progress:
         on_progress(1.0, f"Done → {output_path.name}")
 
-    return ConvertResult(label, output_path, True, "OK", 0)
+    return ConvertResult(resolved[0], output_path, True, f"OK ({label})", 0)
 
 
 def convert_file(
@@ -460,14 +455,7 @@ def _run_ffmpeg(
     temp file and polling it gives smooth updates. Output file size is a backup.
     """
     if on_progress is None:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-            encoding="utf-8",
-            errors="replace",
-        )
+        proc = run_hidden(cmd)
         return proc.returncode, (proc.stderr or proc.stdout or "")
 
     fd, prog_name = tempfile.mkstemp(prefix="me_ff_", suffix=".prog")
@@ -489,7 +477,7 @@ def _run_ffmpeg(
         except OSError:
             pass
 
-    proc = subprocess.Popen(
+    proc = popen_hidden(
         run_cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,

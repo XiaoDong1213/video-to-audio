@@ -180,12 +180,14 @@ build_exe.bat
 set "PYTHON=C:\Path\to\python.exe"
 ```
 
-确认该路径下的 `python.exe` 是 32 位后：
+确认该路径下的 `python.exe` 是 32 位，且能 `import PyQt5` 后：
 
 ```bat
 sync_ffmpeg_x86.bat
 build_exe_x86.bat
 ```
+
+> `requirements-x86.txt` 使用英文注释，避免部分 32 位 pip 按系统编码读取失败导致依赖未安装。
 
 输出：`dist\Video to audio_x86\`
 

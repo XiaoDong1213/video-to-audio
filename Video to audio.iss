@@ -2,7 +2,7 @@
 ; Copyright © 2026 XiaoDong and JiangRTTTR
 
 #define MyAppName "Video to audio"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.0.0"
 #define MyAppPublisher "XiaoDong & JiangRTTTR"
 #define MyAppExeName "Video to audio.exe"
 ; Paths are relative to this .iss file (project root), so the script works on any machine.
@@ -66,5 +66,5 @@ end;
 
 [Run]
 ; Refresh the Windows shell icon cache after an overwrite installation.
-Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden waituntilterminated skipifsilent
+Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden waituntilterminated skipifsilent skipifdoesntexist
 Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
