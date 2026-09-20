@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -27,9 +25,12 @@ from core.utils import (
     ensure_ffmpeg,
     move_selected,
     parse_optional_positive_int,
+    reveal_path,
 )
 from ui.toast import show_corner_toast
+from ui.file_picker import pick_media_files
 from ui.qtcompat import (
+    QT_API,
     AlignCenter,
     AlignVCenter,
     ExtendedSelection,
@@ -71,9 +72,6 @@ QUALITY_CHOICES = [
     (MP3_QUALITY_LABELS["low"], "low"),
 ]
 
-VIDEO_FILTER = "视频文件 (*.mp4 *.mkv *.avi *.mov *.webm *.flv *.wmv *.m4v *.mpeg *.mpg *.ts *.m2ts *.3gp *.ogv);;所有文件 (*.*)"
-AUDIO_FILTER = "音频文件 (*.mp3 *.wav *.aac *.m4a *.flac *.ogg *.opus *.wma);;所有文件 (*.*)"
-
 
 class ConvertWorker(QThread):
     progress = pyqtSignal(float, str)
@@ -112,7 +110,8 @@ class ConvertWorker(QThread):
                 out = result.output_path or "-"
                 self.log_line.emit(f"[{mark}] {result.input_path.name} → {out}")
                 if not result.ok and result.message:
-                    self.log_line.emit("  " + result.message.splitlines()[-1])
+                    for line in result.message.strip().splitlines()[-8:]:
+                        self.log_line.emit("  " + line)
             log_path = write_failure_log(report, data_dir() / "video-to-audio-failures.log")
             self.finished_report.emit((report, log_path))
         except Exception as exc:  # noqa: BLE001
@@ -156,6 +155,7 @@ class MainWindow(QMainWindow):
         self._mode = MODE_CONVERT
         self._worker: QThread | None = None
         self._loading_preview = False
+        self._last_reveal: Path | None = None
 
         self._build_ui()
         self._restore_from_config()
@@ -665,21 +665,38 @@ class MainWindow(QMainWindow):
     def _add_files(self) -> None:
         if self._mode == MODE_MERGE:
             start = self._dialog_start_dir("audio")
-            paths, _ = QFileDialog.getOpenFileNames(self, "选择音频文件", start, AUDIO_FILTER)
+            paths, folder = pick_media_files(self, start_dir=start, kind="audio")
             if paths:
-                self.config.last_audio_dir = str(Path(paths[0]).parent)
-                self._ingest_paths([Path(p) for p in paths])
+                self.config.last_audio_dir = folder or str(paths[0].parent)
+                self._ingest_paths(paths)
         else:
             start = self._dialog_start_dir("video")
-            paths, _ = QFileDialog.getOpenFileNames(self, "选择视频文件", start, VIDEO_FILTER)
+            paths, folder = pick_media_files(self, start_dir=start, kind="video")
             if paths:
-                self.config.last_video_dir = str(Path(paths[0]).parent)
-                self._ingest_paths([Path(p) for p in paths])
+                self.config.last_video_dir = folder or str(paths[0].parent)
+                self._ingest_paths(paths)
         self._persist_config()
 
     def _add_folder(self) -> None:
         kind = "audio" if self._mode == MODE_MERGE else "video"
-        folder = QFileDialog.getExistingDirectory(self, "选择文件夹", self._dialog_start_dir(kind))
+        options = 0
+        try:
+            if QT_API == "pyqt6":
+                from PyQt6.QtWidgets import QFileDialog as _FD
+
+                options = _FD.Option.DontUseNativeDialog
+            else:
+                from PyQt5.QtWidgets import QFileDialog as _FD  # type: ignore
+
+                options = _FD.DontUseNativeDialog
+        except Exception:  # noqa: BLE001
+            options = 0
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            "选择文件夹",
+            self._dialog_start_dir(kind),
+            options,
+        )
         if not folder:
             return
         if self._mode == MODE_MERGE:
@@ -772,39 +789,87 @@ class MainWindow(QMainWindow):
             self._persist_config()
 
     def _open_outdir(self, *, quiet: bool = False) -> None:
+        reveal = self._resolve_reveal_target()
+        if reveal is None:
+            if not quiet:
+                QMessageBox.information(self, "提示", "还没有可打开的输出位置。")
+            return
+        try:
+            reveal_path(reveal)
+        except OSError as exc:
+            if not quiet:
+                QMessageBox.information(self, "提示", f"无法打开：{exc}")
+
+    def _resolve_reveal_target(self) -> Path | None:
+        """Prefer a concrete file so Explorer can /select instead of listing a huge folder."""
+        if self._last_reveal is not None and self._last_reveal.exists():
+            return self._last_reveal
+
         raw = self.outdir_edit.text().strip()
         if raw:
             path = Path(raw)
-        elif self._paths:
-            path = self._paths[0].parent
-        else:
-            remembered = existing_dir(self.config.last_output_dir)
-            path = Path(remembered) if remembered else Path.cwd()
-        if not path.exists():
-            if not quiet:
-                QMessageBox.information(self, "提示", f"目录不存在：{path}")
-            return
-        if sys.platform == "win32":
-            os.startfile(path)  # type: ignore[attr-defined]
-        elif sys.platform == "darwin":
-            subprocess.run(["open", str(path)], check=False)
-        else:
-            subprocess.run(["xdg-open", str(path)], check=False)
+            if path.is_file():
+                return path
+            if path.is_dir():
+                # Pick the newest media-like file if any; otherwise the folder itself.
+                newest = self._newest_output_in(path)
+                return newest or path
+
+        if self._paths:
+            parent = self._paths[0].parent
+            newest = self._newest_output_in(parent)
+            if newest is not None:
+                return newest
+            return parent
+
+        remembered = existing_dir(self.config.last_output_dir)
+        if remembered:
+            path = Path(remembered)
+            return self._newest_output_in(path) or path
+        return None
+
+    def _newest_output_in(self, folder: Path) -> Path | None:
+        if not folder.is_dir():
+            return None
+        best: Path | None = None
+        best_mtime = -1.0
+        scanned = 0
+        try:
+            # Non-recursive; stop early so huge capture folders stay responsive.
+            for item in folder.iterdir():
+                scanned += 1
+                if scanned > 800:
+                    break
+                if not item.is_file():
+                    continue
+                suffix = item.suffix.lower()
+                if suffix not in {".mp3", ".wav", ".aac", ".m4a", ".flac", ".ogg", ".opus", ".wma"}:
+                    continue
+                try:
+                    mtime = item.stat().st_mtime
+                except OSError:
+                    continue
+                if mtime > best_mtime:
+                    best_mtime = mtime
+                    best = item
+        except OSError:
+            return None
+        return best
 
     def _maybe_auto_open(self, file_path: Path | None = None) -> None:
         if not self.auto_open_check.isChecked():
             return
-        if file_path is not None:
-            folder = file_path if file_path.is_dir() else file_path.parent
-            if folder.is_dir():
-                if sys.platform == "win32":
-                    os.startfile(folder)  # type: ignore[attr-defined]
-                elif sys.platform == "darwin":
-                    subprocess.run(["open", str(folder)], check=False)
-                else:
-                    subprocess.run(["xdg-open", str(folder)], check=False)
-                return
-        self._open_outdir(quiet=True)
+        target = file_path
+        if target is None:
+            target = self._last_reveal
+        if target is None:
+            target = self._resolve_reveal_target()
+        if target is None:
+            return
+        try:
+            reveal_path(target)
+        except OSError:
+            pass
 
     def _base_convert_options(self) -> ConvertOptions:
         outdir_raw = self.outdir_edit.text().strip()
@@ -910,7 +975,10 @@ class MainWindow(QMainWindow):
         title = "转换完成" if kind == "ok" else "转换未完成"
         show_corner_toast(title, msg.replace("\n", " "), kind=kind)
         if report.succeeded:
-            self._maybe_auto_open()
+            out = report.succeeded[0].output_path
+            if out is not None:
+                self._last_reveal = out
+            self._maybe_auto_open(out)
 
     def _start_merge(self) -> None:
         if len(self._paths) < 2:
@@ -942,12 +1010,14 @@ class MainWindow(QMainWindow):
         self._set_progress(1.0, "合并完成" if result.ok else "合并失败")
         if result.ok:
             self._append_log(f"[成功] → {result.output_path}")
+            if result.output_path is not None:
+                self._last_reveal = result.output_path
             show_corner_toast("合并完成", str(result.output_path), kind="ok")
             self._maybe_auto_open(result.output_path)
         else:
-            tail = result.message.splitlines()[-1] if result.message else "未知错误"
-            self._append_log("[失败] " + tail)
-            show_corner_toast("合并失败", tail, kind="error")
+            for line in (result.message or "未知错误").strip().splitlines()[-8:]:
+                self._append_log("[失败] " + line)
+            show_corner_toast("合并失败", (result.message or "未知错误").splitlines()[-1], kind="error")
 
     def _on_worker_failed(self, message: str) -> None:
         self._append_log("[异常] " + message)

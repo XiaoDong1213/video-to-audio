@@ -1,8 +1,9 @@
-# 32-bit Windows (Win7 x86 etc.)
-# Use 32-bit Python 3.8-3.10:
-#   py -3.10-32 -m pip install -r requirements-x86.txt
+# 32-bit Windows 7. Build with 32-bit Python 3.8 only (3.9+ will not start on Win7).
+#   D:\Python38-32\python.exe -m pip install -r requirements-x86.txt
+# PyInstaller 6 bootloader requires api-ms-win-core-sysinfo-l1-2-0.dll (Windows 8+).
 PyQt5>=5.15,<6
 typer>=0.12.0
 rich>=13.0.0
 pytest>=8.0
-pyinstaller>=5.13,<7
+pyinstaller==5.13.2
+pyinstaller-hooks-contrib>=2023.6,<2024.9

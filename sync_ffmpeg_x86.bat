@@ -7,9 +7,13 @@ echo ========================================
 echo  Sync 32-bit FFmpeg -^> resources\ffmpeg_x86
 echo ========================================
 echo.
-echo Download (GitHub):
-echo   https://github.com/defisym/FFmpeg-Builds-Win32/releases
-echo Pick a zip with win32-gpl in the name (NOT win64).
+echo Download for Windows 7 (recommended):
+echo   https://github.com/sudo-nautilus/FFmpeg-Builds-Win32/releases/download/latest/ffmpeg-n4.4-latest-win32-gpl-4.4.zip
+echo Or n5.1:
+echo   https://github.com/sudo-nautilus/FFmpeg-Builds-Win32/releases/download/latest/ffmpeg-n5.1-latest-win32-gpl-5.1.zip
+echo.
+echo Do NOT use defisym "latest / n7 / n8 / n9" builds for Win7.
+echo Those link SetThreadDescription and will not start on Windows 7.
 echo Unzip, then paste the folder that contains ffmpeg.exe.
 echo.
 echo Do NOT copy a 64-bit build here.

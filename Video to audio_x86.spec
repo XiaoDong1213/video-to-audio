@@ -58,6 +58,16 @@ a = Analysis(
     noarchive=False,
 )
 
+# Do not ship this PC's Windows 10/11 UCRT. Those copies import
+# api-ms-win-core-sysinfo-l1-2-0.dll, which Windows 7 does not have.
+# The target OS provides its own Universal CRT (Win7: KB2999226).
+def _win7_runtime(name: str) -> bool:
+    base = Path(name).name.lower()
+    return base == "ucrtbase.dll" or base.startswith("api-ms-win-")
+
+
+a.binaries = TOC([item for item in a.binaries if not _win7_runtime(item[0])])
+
 pyz = PYZ(a.pure)
 
 exe_kwargs = dict(

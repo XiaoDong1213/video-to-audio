@@ -158,3 +158,26 @@ def test_bundled_ffmpeg_preferred() -> None:
     resolved = resolve_binary("ffmpeg")
     assert resolved is not None
     assert resolved.resolve() == bundled.resolve()
+
+
+def test_format_process_failure_empty_stderr() -> None:
+    from core.utils import format_process_failure
+
+    text = format_process_failure(3221225781, "")
+    assert "退出码" in text
+    assert "未能启动" in text or "没有输出" in text
+
+
+def test_write_failure_log_includes_exit_code(tmp_path: Path) -> None:
+    from core.converter import BatchReport, ConvertResult, write_failure_log
+
+    report = BatchReport(
+        results=[
+            ConvertResult(Path("a.mpg"), None, False, "ffmpeg 没有输出错误信息（退出码 1）。", 1)
+        ]
+    )
+    log = write_failure_log(report, tmp_path / "fail.log")
+    assert log is not None
+    body = log.read_text(encoding="utf-8")
+    assert "exit_code: 1" in body
+    assert "没有输出" in body

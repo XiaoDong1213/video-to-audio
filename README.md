@@ -75,9 +75,10 @@ video-to-audio/
 │   ├── paths.py
 │   ├── trim_time.py
 │   └── utils.py
-├── ui/                          # 主窗口、裁剪预览、右下角提示、Qt 兼容层
+├── ui/                          # 主窗口、裁剪预览、文件选择、右下角提示、Qt 兼容层
 │   ├── main_window.py
 │   ├── trim_panel.py
+│   ├── file_picker.py
 │   ├── toast.py
 │   ├── combo.py
 │   └── qtcompat.py
@@ -126,15 +127,20 @@ sync_ffmpeg.bat
 
 ### 32 位（仅打老系统包时需要）
 
-1. 打开发布页：[defisym/FFmpeg-Builds-Win32 Releases](https://github.com/defisym/FFmpeg-Builds-Win32/releases)
-2. 下载文件名含 **`win32-gpl`** 的 zip（不要选 win64）
-3. 解压后运行：
+Windows 7 必须用 **旧版 win32 静态包**（例如 FFmpeg 4.4 / 5.1）。现在的 defisym `latest` / `n7` / `n8` 会链接 `SetThreadDescription`，在 Windows 7 上直接弹「无法找到入口」。
+
+推荐下载（二选一）：
+
+- [ffmpeg-n4.4-latest-win32-gpl-4.4.zip](https://github.com/sudo-nautilus/FFmpeg-Builds-Win32/releases/download/latest/ffmpeg-n4.4-latest-win32-gpl-4.4.zip)（更稳）
+- [ffmpeg-n5.1-latest-win32-gpl-5.1.zip](https://github.com/sudo-nautilus/FFmpeg-Builds-Win32/releases/download/latest/ffmpeg-n5.1-latest-win32-gpl-5.1.zip)
+
+解压后运行：
 
 ```bat
 sync_ffmpeg_x86.bat
 ```
 
-按提示粘贴含两个 exe 的目录。完成后应有 `resources\ffmpeg_x86\ffmpeg.exe` 与 `ffprobe.exe`。
+按提示粘贴含 `ffmpeg.exe` / `ffprobe.exe` 的目录。完成后应有 `resources\ffmpeg_x86\ffmpeg.exe` 与 `ffprobe.exe`。
 
 ---
 
@@ -172,7 +178,9 @@ build_exe.bat
 
 ### x86（老款 32 位 Windows）
 
-需要 **32 位** Python 3.8–3.10，以及已同步的 `resources\ffmpeg_x86\`。
+需要 **32 位 Python 3.8**（Windows 7 不能用 3.9 / 3.10），以及已同步的 `resources\ffmpeg_x86\`。打包使用 PyInstaller **5.13.2**（6.x 的启动器在 Windows 7 上会缺 `api-ms-win-core-sysinfo-l1-2-0.dll`）。
+
+目标机若是 Windows 7，还需安装 [微软 Universal C Runtime 更新（KB2999226）](https://support.microsoft.com/help/2999226) 或较新的 Visual C++ 运行库。内置 FFmpeg 请用上文的 4.4 / 5.1 包，不要用会链接 `SetThreadDescription` 的新版。
 
 `build_exe_x86.bat` 默认使用本机路径 `D:\Python38-32\python.exe`（Windows 7 须用 32 位 Python 3.8）。换电脑时打开该 bat，把开头的 `PYTHON=` 改成你的 32 位解释器路径，例如：
 

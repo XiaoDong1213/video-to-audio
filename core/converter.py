@@ -22,6 +22,7 @@ from core.formats import (
 from core.utils import (
     default_output_for,
     ensure_ffmpeg,
+    format_process_failure,
     popen_hidden,
     probe_audio_streams,
     probe_duration_seconds,
@@ -265,13 +266,18 @@ def merge_files(
     label = " + ".join(p.name for p in resolved[:3]) + ("…" if len(resolved) > 3 else "")
 
     if proc.returncode != 0:
-        err = (proc.stderr or proc.stdout or "ffmpeg failed").strip()
-        tail = "\n".join(err.splitlines()[-12:])
         if on_progress:
             on_progress(1.0, "Failed")
         if output_path.exists() and output_path.stat().st_size == 0:
             output_path.unlink(missing_ok=True)
-        return ConvertResult(resolved[0], output_path, False, f"{label}\n{tail}", proc.returncode)
+        detail = format_process_failure(proc.returncode, proc.stderr or proc.stdout)
+        return ConvertResult(
+            resolved[0],
+            output_path,
+            False,
+            f"{label}\n{detail}",
+            proc.returncode,
+        )
 
     if on_progress:
         on_progress(1.0, f"Done → {output_path.name}")
@@ -350,13 +356,12 @@ def convert_file(
     )
 
     if code != 0:
-        err = (err_text or "ffmpeg failed").strip()
-        tail = "\n".join(err.splitlines()[-12:])
+        detail = format_process_failure(code, err_text)
         if on_progress:
             on_progress(1.0, "Failed")
         if output_path.exists() and output_path.stat().st_size == 0:
             output_path.unlink(missing_ok=True)
-        return ConvertResult(input_path, output_path, False, tail, code)
+        return ConvertResult(input_path, output_path, False, detail, code)
 
     if on_progress:
         on_progress(1.0, f"Done → {output_path.name}")
@@ -573,7 +578,8 @@ def write_failure_log(report: BatchReport, log_path: Path) -> Path | None:
     lines = ["# video-to-audio failure log", ""]
     for item in failed:
         lines.append(f"## {item.input_path}")
-        lines.append(item.message)
+        lines.append(f"exit_code: {item.returncode}")
+        lines.append(item.message.strip() or "(无详细错误)")
         lines.append("")
     log_path.write_text("\n".join(lines), encoding="utf-8")
     return log_path

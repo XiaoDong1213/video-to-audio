@@ -208,6 +208,80 @@ QListWidget#fileList::item:selected {
     color: #0C4A6E;
 }
 
+QDialog#mediaFilePicker {
+    background: #F1F5F9;
+}
+
+QListWidget#mediaPickerList {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 6px;
+    outline: 0;
+}
+
+QListWidget#mediaPickerList::item {
+    border-radius: 8px;
+    padding: 4px 8px;
+    color: #0F172A;
+}
+
+QListWidget#mediaPickerList::item:hover {
+    background: #F8FAFC;
+}
+
+QListWidget#mediaPickerList::item:selected {
+    background: #E0F2FE;
+    color: #0C4A6E;
+}
+
+QPushButton#pickerNavBtn {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    color: #334155;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 0 12px;
+    min-height: 34px;
+}
+
+QPushButton#pickerNavBtn:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+}
+
+QPushButton#pickerActionBtn,
+QPushButton#pickerActionBtnPrimary {
+    font-weight: 600;
+    font-size: 13px;
+    border-radius: 8px;
+    padding: 0 18px;
+    min-height: 36px;
+    min-width: 110px;
+}
+
+QPushButton#pickerActionBtn {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    color: #334155;
+}
+
+QPushButton#pickerActionBtn:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+}
+
+QPushButton#pickerActionBtnPrimary {
+    background: #0284C7;
+    border: 1px solid #0284C7;
+    color: #FFFFFF;
+}
+
+QPushButton#pickerActionBtnPrimary:hover {
+    background: #0369A1;
+    border-color: #0369A1;
+}
+
 QFrame#playerCard {
     background: #0F172A;
     border: 1px solid #1E293B;

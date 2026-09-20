@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -42,6 +43,44 @@ def popen_hidden(cmd: list[str], **kwargs: Any) -> subprocess.Popen[str]:
     """subprocess.Popen with Windows console hidden."""
     merged = {**_win_no_window_kwargs(), **kwargs}
     return subprocess.Popen(cmd, **merged)
+
+
+def format_process_failure(code: int, err_text: str | None, *, tool: str = "ffmpeg") -> str:
+    """User-facing failure text. Empty stderr usually means the process never really started."""
+    text = (err_text or "").strip()
+    if not text:
+        return (
+            f"{tool} 没有输出错误信息（退出码 {code}）。\n"
+            "常见原因：程序未能启动（缺少系统 DLL）、被杀软拦截，或没有运行权限。\n"
+            "可到安装目录的 ffmpeg 文件夹里单独运行 ffmpeg.exe 排查。"
+        )
+    tail = "\n".join(text.splitlines()[-20:])
+    return f"退出码 {code}\n{tail}"
+
+
+def reveal_path(path: Path) -> None:
+    """
+    Open the file manager on path.
+    On Windows, prefer selecting the file so Explorer does not enumerate a huge folder.
+    """
+    target = path.resolve()
+    if sys.platform == "win32":
+        if target.exists():
+            # Do not use CREATE_NO_WINDOW — Explorer must show a window.
+            subprocess.run(["explorer", f"/select,{target}"], check=False)
+            return
+        parent = target.parent
+        if parent.is_dir():
+            os.startfile(str(parent))  # type: ignore[attr-defined]
+        return
+    if sys.platform == "darwin":
+        if target.is_file():
+            subprocess.run(["open", "-R", str(target)], check=False)
+        else:
+            subprocess.run(["open", str(target)], check=False)
+        return
+    folder = target if target.is_dir() else target.parent
+    subprocess.run(["xdg-open", str(folder)], check=False)
 
 
 def which_ffmpeg() -> str:

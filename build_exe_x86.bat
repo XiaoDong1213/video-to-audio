@@ -57,8 +57,11 @@ if errorlevel 1 (
 )
 
 "%PYTHON%" -m PyInstaller --version >nul 2>nul
+"%PYTHON%" -c "import PyInstaller; raise SystemExit(0 if PyInstaller.__version__=='5.13.2' else 1)"
 if errorlevel 1 (
-    "%PYTHON%" -m pip install "pyinstaller>=5.13,<7"
+    echo [ERROR] Need PyInstaller 5.13.2 for Windows 7. PyInstaller 6 will not start on Win7.
+    pause
+    exit /b 1
 )
 
 echo [1/3] Cleaning...
