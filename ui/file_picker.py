@@ -16,6 +16,7 @@ from ui.qtcompat import (
     DialogAccepted,
     ExtendedSelection,
     PointingHandCursor,
+    QComboBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -43,6 +44,33 @@ _THUMB_H = 54
 _ROW_H = 64
 _PLACEHOLDER: QIcon | None = None
 _FOLDER_ICON: QIcon | None = None
+
+# Newest first by default.
+SORT_MTIME_DESC = "mtime_desc"
+SORT_MTIME_ASC = "mtime_asc"
+SORT_NAME_ASC = "name_asc"
+SORT_NAME_DESC = "name_desc"
+SORT_SIZE_DESC = "size_desc"
+SORT_SIZE_ASC = "size_asc"
+
+_SORT_CHOICES: list[tuple[str, str]] = [
+    ("修改时间（新→旧）", SORT_MTIME_DESC),
+    ("修改时间（旧→新）", SORT_MTIME_ASC),
+    ("名称（A→Z）", SORT_NAME_ASC),
+    ("名称（Z→A）", SORT_NAME_DESC),
+    ("大小（大→小）", SORT_SIZE_DESC),
+    ("大小（小→大）", SORT_SIZE_ASC),
+]
+
+
+class _Entry:
+    __slots__ = ("path", "name", "mtime", "size")
+
+    def __init__(self, path: Path, name: str, mtime: float, size: int) -> None:
+        self.path = path
+        self.name = name
+        self.mtime = mtime
+        self.size = size
 
 
 def _roles() -> tuple[int, int, int]:
@@ -95,10 +123,31 @@ def _cache_key(path: Path) -> str:
     return hashlib.sha1(raw).hexdigest()
 
 
-def _list_dir_and_media(folder: Path, extensions: frozenset[str]) -> tuple[list[Path], list[Path]]:
+def _sort_entries(entries: list[_Entry], mode: str) -> None:
+    if mode == SORT_MTIME_ASC:
+        entries.sort(key=lambda e: (e.mtime, e.name.lower()))
+    elif mode == SORT_NAME_ASC:
+        entries.sort(key=lambda e: e.name.lower())
+    elif mode == SORT_NAME_DESC:
+        entries.sort(key=lambda e: e.name.lower(), reverse=True)
+    elif mode == SORT_SIZE_DESC:
+        entries.sort(key=lambda e: (e.size, e.name.lower()), reverse=True)
+    elif mode == SORT_SIZE_ASC:
+        entries.sort(key=lambda e: (e.size, e.name.lower()))
+    else:
+        # SORT_MTIME_DESC — newest first
+        entries.sort(key=lambda e: (e.mtime, e.name.lower()), reverse=True)
+
+
+def _list_dir_and_media(
+    folder: Path,
+    extensions: frozenset[str],
+    *,
+    sort_mode: str = SORT_MTIME_DESC,
+) -> tuple[list[_Entry], list[_Entry]]:
     """Return (subdirs, media files). Fast scandir, no thumbnails."""
-    dirs: list[Path] = []
-    files: list[Path] = []
+    dirs: list[_Entry] = []
+    files: list[_Entry] = []
     try:
         with os.scandir(folder) as it:
             for entry in it:
@@ -110,15 +159,24 @@ def _list_dir_and_media(folder: Path, extensions: frozenset[str]) -> tuple[list[
                     is_file = entry.is_file(follow_symlinks=False)
                 except OSError:
                     continue
+                try:
+                    st = entry.stat(follow_symlinks=False)
+                    mtime = float(st.st_mtime)
+                    size = int(st.st_size) if is_file else 0
+                except OSError:
+                    mtime = 0.0
+                    size = 0
                 path = Path(entry.path)
+                item = _Entry(path, name, mtime, size)
                 if is_dir:
-                    dirs.append(path)
+                    dirs.append(item)
                 elif is_file and path.suffix.lower() in extensions:
-                    files.append(path)
+                    files.append(item)
     except OSError:
         return [], []
-    dirs.sort(key=lambda p: p.name.lower())
-    files.sort(key=lambda p: p.name.lower())
+    # Folders: name A→Z so browsing stays predictable; files follow chosen sort.
+    dirs.sort(key=lambda e: e.name.lower())
+    _sort_entries(files, sort_mode)
     return dirs, files
 
 
@@ -131,13 +189,12 @@ def _windows_drives() -> list[Path]:
     return drives
 
 
-def _non_native_dir_options() -> int:
-    try:
-        if QT_API == "pyqt6":
-            return int(QFileDialog.Option.DontUseNativeDialog)
-        return int(QFileDialog.DontUseNativeDialog)  # type: ignore[attr-defined]
-    except Exception:  # noqa: BLE001
-        return 0
+def _non_native_dir_options():
+    """Return Options enum (not int) — PyQt rejects bare int for getExistingDirectory."""
+    if QT_API == "pyqt6":
+        return QFileDialog.Option.DontUseNativeDialog | QFileDialog.Option.ShowDirsOnly
+    # PyQt5: DontUseNativeDialog is on QFileDialog; ShowDirsOnly is the default flag.
+    return QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly  # type: ignore[attr-defined]
 
 
 class _ThumbWorker(QThread):
@@ -235,6 +292,7 @@ class MediaFilePicker(QDialog):
 
         self._kind = kind
         self._exts = VIDEO_EXTENSIONS if kind == "video" else AUDIO_EXTENSIONS
+        self._sort_mode = SORT_MTIME_DESC
         # None = Windows drive list ("此电脑")
         self._folder: Path | None = (
             Path(start_dir) if start_dir and Path(start_dir).is_dir() else Path.home()
@@ -277,13 +335,27 @@ class MediaFilePicker(QDialog):
         nav.addWidget(self.btn_refresh)
         root.addLayout(nav)
 
+        tools = QHBoxLayout()
+        tools.setSpacing(8)
+        sort_label = QLabel("排序")
+        sort_label.setObjectName("mutedText")
+        self.sort_combo = QComboBox()
+        self.sort_combo.setObjectName("pickerSortCombo")
+        self.sort_combo.setMinimumWidth(180)
+        self.sort_combo.setFixedHeight(34)
+        for label, mode in _SORT_CHOICES:
+            self.sort_combo.addItem(label, mode)
+        self.sort_combo.setCurrentIndex(0)  # 修改时间（新→旧）
+        self.sort_combo.currentIndexChanged.connect(self._on_sort_changed)
         hint = QLabel(
-            "可浏览磁盘与子文件夹；双击文件夹进入，双击文件添加。"
-            "缩略图只对当前可见视频按需生成。"
+            "双击文件夹进入，双击文件添加。缩略图只对当前可见视频按需生成。"
         )
         hint.setObjectName("mutedText")
         hint.setWordWrap(True)
-        root.addWidget(hint)
+        tools.addWidget(sort_label, 0, AlignVCenter)
+        tools.addWidget(self.sort_combo, 0)
+        tools.addWidget(hint, 1, AlignVCenter)
+        root.addLayout(tools)
 
         self.list = QListWidget()
         self.list.setObjectName("mediaPickerList")
@@ -375,6 +447,14 @@ class MediaFilePicker(QDialog):
         else:
             self.count_label.setText("路径不存在")
 
+    def _on_sort_changed(self, _index: int = 0) -> None:
+        data = self.sort_combo.currentData()
+        mode = str(data) if data else SORT_MTIME_DESC
+        if mode == self._sort_mode:
+            return
+        self._sort_mode = mode
+        self._reload()
+
     def _reload(self) -> None:
         self._worker.clear_queue()
         self.list.clear()
@@ -389,11 +469,13 @@ class MediaFilePicker(QDialog):
             return
 
         self.path_edit.setText(str(self._folder))
-        dirs, files = _list_dir_and_media(self._folder, self._exts)
-        for path in dirs:
-            self._add_dir_item(path)
-        for path in files:
-            self._add_file_item(path)
+        dirs, files = _list_dir_and_media(
+            self._folder, self._exts, sort_mode=self._sort_mode
+        )
+        for entry in dirs:
+            self._add_dir_item(entry.path, label=entry.name or str(entry.path))
+        for entry in files:
+            self._add_file_item(entry.path)
         self.count_label.setText(
             f"{len(dirs)} 个文件夹 · {len(files)} 个文件 · {self._folder}"
         )

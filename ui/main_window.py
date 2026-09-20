@@ -679,24 +679,28 @@ class MainWindow(QMainWindow):
 
     def _add_folder(self) -> None:
         kind = "audio" if self._mode == MODE_MERGE else "video"
-        options = 0
         try:
             if QT_API == "pyqt6":
                 from PyQt6.QtWidgets import QFileDialog as _FD
 
-                options = _FD.Option.DontUseNativeDialog
+                options = _FD.Option.DontUseNativeDialog | _FD.Option.ShowDirsOnly
             else:
                 from PyQt5.QtWidgets import QFileDialog as _FD  # type: ignore
 
-                options = _FD.DontUseNativeDialog
+                options = _FD.DontUseNativeDialog | _FD.ShowDirsOnly
         except Exception:  # noqa: BLE001
-            options = 0
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "选择文件夹",
-            self._dialog_start_dir(kind),
-            options,
-        )
+            options = None
+        if options is None:
+            folder = QFileDialog.getExistingDirectory(
+                self, "选择文件夹", self._dialog_start_dir(kind)
+            )
+        else:
+            folder = QFileDialog.getExistingDirectory(
+                self,
+                "选择文件夹",
+                self._dialog_start_dir(kind),
+                options,
+            )
         if not folder:
             return
         if self._mode == MODE_MERGE:
